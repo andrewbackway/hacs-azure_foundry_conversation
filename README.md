@@ -38,7 +38,7 @@ classic Chat Completions API rejects tools + reasoning for these models — see
 
 1. Open your Foundry resource and copy the **endpoint**
    (`https://<your-resource>.services.ai.azure.com/`) and a **key** from
-   *Keys and Endpoint*.
+   *Keys and Endpoint*. 
 2. **Deploy** the chat model and note the **deployment name** — this is the
    "model name" the integration asks for (not the base model id).
 3. Confirm the deployment supports the **Responses API** (required for tools +
@@ -217,5 +217,6 @@ integration and inspired by
 ## License
 
 [Apache-2.0](LICENSE).
-#   h a c s - a z u r e _ f o u n d r y _ c o n v e r s a t i o n  
+#   h a c s - a z u r e _ f o u n d r y _ c o n v e r s a t i o n 
+ 
  
