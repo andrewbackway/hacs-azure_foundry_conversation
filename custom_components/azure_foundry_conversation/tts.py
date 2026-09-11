@@ -125,9 +125,9 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
 
     async def _async_load_voices(self) -> None:
         """Fetch and cache the available voices grouped by locale."""
-        data = self.subentry.data
-        endpoint = data.get(CONF_TTS_ENDPOINT)
-        api_key = data.get(CONF_TTS_API_KEY)
+        endpoint, api_key = self._resolve_speech_credentials(
+            CONF_TTS_ENDPOINT, CONF_TTS_API_KEY
+        )
         if not endpoint or not api_key:
             LOGGER.warning(
                 "Azure Speech TTS endpoint or API key not configured; "
@@ -161,8 +161,9 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
     ) -> tts.TtsAudioType:
         """Synthesize speech via the Azure Speech REST API."""
         data = self.subentry.data
-        endpoint = data.get(CONF_TTS_ENDPOINT)
-        api_key = data.get(CONF_TTS_API_KEY)
+        endpoint, api_key = self._resolve_speech_credentials(
+            CONF_TTS_ENDPOINT, CONF_TTS_API_KEY
+        )
         if not endpoint or not api_key:
             raise HomeAssistantError(
                 "Azure Speech TTS is not configured; "

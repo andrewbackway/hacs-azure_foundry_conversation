@@ -304,7 +304,7 @@ class LLMSubentryFlowHandler(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Collect advanced/model-specific options."""
         options = self.options
-        model = options[CONF_CHAT_MODEL]
+        model = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
 
         schema: dict[Any, Any] = {
             vol.Optional(
@@ -403,10 +403,10 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
             schema[vol.Required(CONF_NAME, default=DEFAULT_STT_NAME)] = str
         schema.update(
             {
-                vol.Required(CONF_STT_ENDPOINT): TextSelector(
+                vol.Optional(CONF_STT_ENDPOINT): TextSelector(
                     TextSelectorConfig(type=TextSelectorType.URL)
                 ),
-                vol.Required(CONF_STT_API_KEY): TextSelector(
+                vol.Optional(CONF_STT_API_KEY): TextSelector(
                     TextSelectorConfig(type=TextSelectorType.PASSWORD)
                 ),
                 vol.Optional(CONF_STT_LANGUAGE, default=DEFAULT_STT_LANGUAGE): str,
@@ -483,10 +483,10 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
             schema[vol.Required(CONF_NAME, default=DEFAULT_TTS_NAME)] = str
         schema.update(
             {
-                vol.Required(CONF_TTS_ENDPOINT): TextSelector(
+                vol.Optional(CONF_TTS_ENDPOINT): TextSelector(
                     TextSelectorConfig(type=TextSelectorType.URL)
                 ),
-                vol.Required(CONF_TTS_API_KEY): TextSelector(
+                vol.Optional(CONF_TTS_API_KEY): TextSelector(
                     TextSelectorConfig(type=TextSelectorType.PASSWORD)
                 ),
                 vol.Optional(CONF_TTS_VOICE, default=DEFAULT_TTS_VOICE): str,

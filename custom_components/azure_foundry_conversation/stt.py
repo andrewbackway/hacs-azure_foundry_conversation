@@ -94,8 +94,9 @@ class AzureFoundrySTTEntity(stt.SpeechToTextEntity, AzureFoundrySpeechEntity):
     ) -> SpeechResult:
         """Recognize audio via the Azure Speech short-audio REST API."""
         options = self.subentry.data
-        endpoint = options.get(CONF_STT_ENDPOINT)
-        api_key = options.get(CONF_STT_API_KEY)
+        endpoint, api_key = self._resolve_speech_credentials(
+            CONF_STT_ENDPOINT, CONF_STT_API_KEY
+        )
         if not endpoint or not api_key:
             LOGGER.error(
                 "Azure Speech STT endpoint or API key not configured; "

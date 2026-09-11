@@ -11,6 +11,7 @@ from voluptuous_openapi import convert
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
+from homeassistant.const import CONF_API_KEY
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import llm
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -19,11 +20,13 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_CHAT_MODEL,
+    CONF_ENDPOINT,
     CONF_MAX_TOKENS,
     CONF_REASONING_EFFORT,
     CONF_VERBOSITY,
     DOMAIN,
     LOGGER,
+    RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
     reasoning_effort_options,
 )
@@ -181,7 +184,7 @@ class AzureFoundryBaseLLMEntity(Entity):
         """Drive the model + tool-call loop, streaming into the chat log."""
         options = self.subentry.data
         client = self.entry.runtime_data
-        model: str = options[CONF_CHAT_MODEL]
+        model: str = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
 
         model_args: dict[str, Any] = {
             "model": model,
@@ -278,3 +281,12 @@ class AzureFoundrySpeechEntity(Entity):
             model="Azure AI Speech",
             entry_type=DeviceEntryType.SERVICE,
         )
+
+    def _resolve_speech_credentials(
+        self, endpoint_key: str, api_key_key: str
+    ) -> tuple[str | None, str | None]:
+        """Return the speech endpoint/key, falling back to the main entry."""
+        data = self.subentry.data
+        endpoint = data.get(endpoint_key) or self.entry.data.get(CONF_ENDPOINT)
+        api_key = data.get(api_key_key) or self.entry.data.get(CONF_API_KEY)
+        return endpoint, api_key
