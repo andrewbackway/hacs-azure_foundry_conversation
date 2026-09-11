@@ -309,8 +309,9 @@ class AzureFoundryBaseLLMEntity(Entity):
 class AzureFoundrySpeechEntity(Entity):
     """Base entity for the Azure AI Speech STT/TTS platforms."""
 
+    # Subclasses must set a non-None _attr_name; the TTS component rejects a
+    # None engine name ("TTS engine name is not set").
     _attr_has_entity_name = True
-    _attr_name = None
 
     def __init__(
         self, entry: AzureFoundryConfigEntry, subentry: ConfigSubentry

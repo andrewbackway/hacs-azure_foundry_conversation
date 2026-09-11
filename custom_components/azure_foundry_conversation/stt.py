@@ -56,6 +56,8 @@ async def async_setup_entry(
 class AzureFoundrySTTEntity(stt.SpeechToTextEntity, AzureFoundrySpeechEntity):
     """Azure AI Speech short-audio recognition entity."""
 
+    _attr_name = "Speech-to-text"
+
     @property
     def supported_languages(self) -> list[str]:
         """Return the supported recognition languages."""

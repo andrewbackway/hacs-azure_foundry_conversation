@@ -100,6 +100,8 @@ def _build_ssml(
 class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
     """Azure AI Speech neural text-to-speech entity."""
 
+    _attr_name = "Text-to-speech"
+
     # Populated per instance from the Speech voices/list endpoint.
     _voices: dict[str, list[tts.Voice]] = {}
 
