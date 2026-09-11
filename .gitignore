@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.log
+
+# Local secrets — never commit
+.env
+.env.*
+!.env.example
+secrets.env
+*.secret
+
+# Smoke test output
+smoketest-output/

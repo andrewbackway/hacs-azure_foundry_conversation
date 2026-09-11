@@ -1,0 +1,173 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Azure AI Foundry",
+        "description": "Enter your Azure AI Foundry resource endpoint and API key.",
+        "data": {
+          "endpoint": "Endpoint URL",
+          "api_key": "API key"
+        },
+        "data_description": {
+          "endpoint": "Base resource URL, e.g. https://your-resource.services.ai.azure.com/",
+          "api_key": "A key from the resource's Keys and Endpoint page"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Azure AI Foundry",
+        "description": "The API key is no longer valid. Enter the connection details again.",
+        "data": {
+          "endpoint": "Endpoint URL",
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This endpoint is already configured",
+      "reauth_successful": "Re-authentication was successful"
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "initiate_flow": {
+        "user": "Add conversation agent",
+        "reconfigure": "Reconfigure conversation agent"
+      },
+      "entry_type": "Conversation agent",
+      "step": {
+        "init": {
+          "title": "Conversation agent",
+          "data": {
+            "name": "Name",
+            "prompt": "Instructions",
+            "llm_hass_api": "Control Home Assistant",
+            "chat_model": "Model (Azure deployment name)",
+            "recommended": "Recommended model settings"
+          },
+          "data_description": {
+            "prompt": "Instructions/system prompt. Supports templates. Leave the default to let the agent control exposed entities.",
+            "llm_hass_api": "Select an API to let the agent control your home",
+            "chat_model": "The Azure deployment name of your chat model, e.g. gpt-5.6-sol"
+          }
+        },
+        "advanced": {
+          "title": "Advanced settings",
+          "data": {
+            "max_tokens": "Maximum output tokens",
+            "reasoning_effort": "Reasoning effort",
+            "verbosity": "Verbosity"
+          }
+        }
+      }
+    },
+    "ai_task_data": {
+      "initiate_flow": {
+        "user": "Add AI Task entity",
+        "reconfigure": "Reconfigure AI Task entity"
+      },
+      "entry_type": "AI Task",
+      "step": {
+        "init": {
+          "title": "AI Task",
+          "data": {
+            "name": "Name",
+            "chat_model": "Model (Azure deployment name)",
+            "recommended": "Recommended model settings"
+          }
+        },
+        "advanced": {
+          "title": "Advanced settings",
+          "data": {
+            "max_tokens": "Maximum output tokens",
+            "reasoning_effort": "Reasoning effort",
+            "verbosity": "Verbosity"
+          }
+        }
+      }
+    },
+    "stt": {
+      "initiate_flow": {
+        "user": "Add speech-to-text",
+        "reconfigure": "Reconfigure speech-to-text"
+      },
+      "entry_type": "Speech-to-text",
+      "step": {
+        "init": {
+          "title": "Azure Speech - speech-to-text",
+          "data": {
+            "name": "Name",
+            "stt_endpoint": "Speech endpoint URL",
+            "stt_api_key": "Speech API key",
+            "stt_language": "Recognition language",
+            "stt_format": "Result format",
+            "stt_profanity": "Profanity handling"
+          }
+        }
+      }
+    },
+    "tts": {
+      "initiate_flow": {
+        "user": "Add text-to-speech",
+        "reconfigure": "Reconfigure text-to-speech"
+      },
+      "entry_type": "Text-to-speech",
+      "step": {
+        "init": {
+          "title": "Azure Speech - text-to-speech",
+          "data": {
+            "name": "Name",
+            "tts_endpoint": "Speech endpoint URL",
+            "tts_api_key": "Speech API key",
+            "tts_voice": "Voice (short name)",
+            "tts_language": "Language/locale",
+            "tts_output_format": "Output format",
+            "tts_rate": "Rate",
+            "tts_pitch": "Pitch",
+            "tts_volume": "Volume",
+            "tts_style": "Speaking style",
+            "tts_style_degree": "Style degree",
+            "tts_role": "Role"
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "reasoning_effort": {
+      "options": {
+        "none": "None",
+        "minimal": "Minimal",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "xhigh": "Extra high",
+        "max": "Max"
+      }
+    },
+    "verbosity": {
+      "options": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      }
+    },
+    "stt_format": {
+      "options": {
+        "simple": "Simple",
+        "detailed": "Detailed"
+      }
+    },
+    "stt_profanity": {
+      "options": {
+        "masked": "Masked",
+        "removed": "Removed",
+        "raw": "Raw"
+      }
+    }
+  }
+}

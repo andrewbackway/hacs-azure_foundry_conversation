@@ -1,0 +1,4 @@
+# Code owners for this repository.
+# Update the handle below to your GitHub username.
+*                                             @andrewbackway
+/custom_components/azure_foundry_conversation/ @andrewbackway
