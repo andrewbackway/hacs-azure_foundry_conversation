@@ -1,11 +1,11 @@
 # Azure AI Foundry Conversation for Home Assistant
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/andrewbackwayintegration)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.1%2B-blue.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Validate](https://github.com/Hacs/hacs-azure_foundry_conversation/actions/workflows/validate.yaml/badge.svg)](https://github.com/Hacs/hacs-azure_foundry_conversation/actions/workflows/validate.yaml)
-[![Lint](https://github.com/Hacs/hacs-azure_foundry_conversation/actions/workflows/lint.yaml/badge.svg)](https://github.com/Hacs/hacs-azure_foundry_conversation/actions/workflows/lint.yaml)
-[![Test](https://github.com/Hacs/hacs-azure_foundry_conversation/actions/workflows/test.yaml/badge.svg)](https://github.com/Hacs/hacs-azure_foundry_conversation/actions/workflows/test.yaml)
+[![Validate](https://github.com/andrewbackwayhacs-azure_foundry_conversation/actions/workflows/validate.yaml/badge.svg)](https://github.com/andrewbackwayhacs-azure_foundry_conversation/actions/workflows/validate.yaml)
+[![Lint](https://github.com/andrewbackwayhacs-azure_foundry_conversation/actions/workflows/lint.yaml/badge.svg)](https://github.com/andrewbackwayhacs-azure_foundry_conversation/actions/workflows/lint.yaml)
+[![Test](https://github.com/andrewbackwayhacs-azure_foundry_conversation/actions/workflows/test.yaml/badge.svg)](https://github.com/andrewbackwayhacs-azure_foundry_conversation/actions/workflows/test.yaml)
 
 A custom [Home Assistant](https://www.home-assistant.io/) integration that adds an
 **Azure AI Foundry**-backed conversation agent (plus AI Task, Speech-to-Text and
@@ -57,7 +57,7 @@ classic Chat Completions API rejects tools + reasoning for these models — see
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Hacs&repository=hacs-azure_foundry_conversation&category=integration)
 
 1. In HACS, add this repository as a custom repository (category: **Integration**):
-   `https://github.com/Hacs/hacs-azure_foundry_conversation`.
+   `https://github.com/andrewbackwayhacs-azure_foundry_conversation`.
 2. Install **Azure AI Foundry Conversation**.
 3. Restart Home Assistant.
 
