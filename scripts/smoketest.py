@@ -58,6 +58,10 @@ def _request(
 def _speech_path(endpoint: str, custom: str, regional: str) -> str:
     host = endpoint.split("//", 1)[-1].lower()
     base = endpoint.rstrip("/")
+    marker = ".services.ai.azure.com"
+    if marker in host:
+        base = base[: base.lower().index(marker)] + ".cognitiveservices.azure.com"
+        host = base.split("//", 1)[-1].lower()
     return base + (custom if "cognitiveservices" in host else regional)
 
 

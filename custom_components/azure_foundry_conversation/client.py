@@ -61,11 +61,22 @@ def endpoint_host(endpoint: str) -> str:
 
 
 def _base_speech_url(endpoint: str) -> tuple[str, str, str]:
-    """Split a Speech endpoint into (scheme, netloc, lowercased-host)."""
+    """Split a Speech endpoint into (scheme, netloc, lowercased-host).
+
+    Azure AI Foundry hosts (``*.services.ai.azure.com``) don't serve the Speech
+    REST endpoints, so they're rewritten to the equivalent Cognitive Services
+    host (``*.cognitiveservices.azure.com``) exposed by the same resource. This
+    lets STT/TTS fall back to the main Foundry endpoint and still resolve.
+    """
     parts = urlsplit((endpoint or "").strip())
     scheme = parts.scheme or "https"
     netloc = parts.netloc or parts.path
-    return scheme, netloc, netloc.lower()
+    lowered = netloc.lower()
+    marker = ".services.ai.azure.com"
+    if marker in lowered:
+        netloc = netloc[: lowered.index(marker)] + ".cognitiveservices.azure.com"
+        lowered = netloc.lower()
+    return scheme, netloc, lowered
 
 
 def build_stt_url(

@@ -85,6 +85,23 @@ def test_tts_voices_url_forms() -> None:
     )
 
 
+def test_speech_url_rewrites_foundry_host() -> None:
+    """Foundry ``services.ai.azure.com`` hosts map to the Speech subdomain."""
+    assert build_tts_voices_url("https://r.services.ai.azure.com/") == (
+        "https://r.cognitiveservices.azure.com/tts/cognitiveservices/voices/list"
+    )
+    assert build_tts_url("https://r.services.ai.azure.com/") == (
+        "https://r.cognitiveservices.azure.com/tts/cognitiveservices/v1"
+    )
+    assert build_stt_url(
+        "https://r.services.ai.azure.com/", "en-US", "simple", "masked"
+    ) == (
+        "https://r.cognitiveservices.azure.com"
+        "/stt/speech/recognition/conversation/cognitiveservices/v1"
+        "?language=en-US&format=simple&profanity=masked"
+    )
+
+
 def test_reasoning_effort_options() -> None:
     assert reasoning_effort_options("gpt-5.6-sol") == [
         "none",
