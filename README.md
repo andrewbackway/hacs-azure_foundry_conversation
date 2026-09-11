@@ -54,7 +54,7 @@ classic Chat Completions API rejects tools + reasoning for these models — see
 
 ### HACS (recommended)
 
-[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Hacs&repository=hacs-azure_foundry_conversation&category=integration)
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=andrewbackway&repository=hacs-azure_foundry_conversation&category=integration)
 
 1. In HACS, add this repository as a custom repository (category: **Integration**):
    `https://github.com/andrewbackway/hacs-azure_foundry_conversation`.
