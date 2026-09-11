@@ -54,6 +54,11 @@ def _log_error(
     )
 
 
+def _is_unsupported(value: Any) -> bool:
+    """Return True for a voluptuous_openapi UNSUPPORTED sentinel."""
+    return value is UNSUPPORTED or type(value).__name__ == "_Unsupported"
+
+
 def _strip_unsupported(obj: Any) -> Any:
     """Recursively drop voluptuous_openapi UNSUPPORTED sentinels from a schema.
 
@@ -64,7 +69,7 @@ def _strip_unsupported(obj: Any) -> Any:
         cleaned = {
             key: _strip_unsupported(val)
             for key, val in obj.items()
-            if val is not UNSUPPORTED
+            if not _is_unsupported(val)
         }
         properties = cleaned.get("properties")
         required = cleaned.get("required")
@@ -74,15 +79,28 @@ def _strip_unsupported(obj: Any) -> Any:
             ]
         return cleaned
     if isinstance(obj, list):
-        return [_strip_unsupported(item) for item in obj if item is not UNSUPPORTED]
+        return [_strip_unsupported(item) for item in obj if not _is_unsupported(item)]
     return obj
+
+
+def _as_object_schema(schema: Any) -> dict[str, Any]:
+    """Coerce a converted schema into a JSON-serializable object schema."""
+    if not isinstance(schema, dict) or _is_unsupported(schema):
+        return {"type": "object", "properties": {}}
+    return schema
 
 
 def _format_tool(tool: llm.Tool, custom_serializer: Any) -> dict[str, Any]:
     """Convert a Home Assistant LLM tool into a Responses function tool."""
-    parameters = _strip_unsupported(
-        convert(tool.parameters, custom_serializer=custom_serializer)
-    )
+    raw = convert(tool.parameters, custom_serializer=custom_serializer)
+    parameters = _as_object_schema(_strip_unsupported(raw))
+    if parameters != raw:
+        LOGGER.warning(
+            "Tool %r has parameters that could not be represented as JSON "
+            "schema; dropped the unsupported parts. Raw conversion: %r",
+            tool.name,
+            raw,
+        )
     return {
         "type": "function",
         "name": tool.name,
@@ -110,7 +128,7 @@ def _adjust_schema(schema: dict[str, Any]) -> None:
 
 def _format_structure(structure: Any) -> dict[str, Any]:
     """Convert a voluptuous structure to a strict JSON schema."""
-    result = _strip_unsupported(convert(structure))
+    result = _as_object_schema(_strip_unsupported(convert(structure)))
     _adjust_schema(result)
     return result
 
