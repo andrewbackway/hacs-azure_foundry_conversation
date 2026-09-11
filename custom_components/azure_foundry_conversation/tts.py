@@ -126,10 +126,16 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
     async def _async_load_voices(self) -> None:
         """Fetch and cache the available voices grouped by locale."""
         data = self.subentry.data
-        try:
-            raw = await async_list_voices(
-                self.hass, data[CONF_TTS_ENDPOINT], data[CONF_TTS_API_KEY]
+        endpoint = data.get(CONF_TTS_ENDPOINT)
+        api_key = data.get(CONF_TTS_API_KEY)
+        if not endpoint or not api_key:
+            LOGGER.warning(
+                "Azure Speech TTS endpoint or API key not configured; "
+                "skipping voice list. Reconfigure the TTS entry to enable it"
             )
+            return
+        try:
+            raw = await async_list_voices(self.hass, endpoint, api_key)
         except httpx.HTTPError as err:
             LOGGER.warning("Could not fetch Azure Speech voices: %s", err)
             return
@@ -155,6 +161,13 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
     ) -> tts.TtsAudioType:
         """Synthesize speech via the Azure Speech REST API."""
         data = self.subentry.data
+        endpoint = data.get(CONF_TTS_ENDPOINT)
+        api_key = data.get(CONF_TTS_API_KEY)
+        if not endpoint or not api_key:
+            raise HomeAssistantError(
+                "Azure Speech TTS is not configured; "
+                "reconfigure the TTS entry with an endpoint and API key"
+            )
         voice = options.get(tts.ATTR_VOICE) or data.get(
             CONF_TTS_VOICE, DEFAULT_TTS_VOICE
         )
@@ -176,12 +189,12 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
         )
 
         headers = {
-            "Ocp-Apim-Subscription-Key": data[CONF_TTS_API_KEY],
+            "Ocp-Apim-Subscription-Key": api_key,
             "Content-Type": "application/ssml+xml",
             "X-Microsoft-OutputFormat": output_format,
             "User-Agent": "home-assistant-azure-foundry",
         }
-        url = build_tts_url(data[CONF_TTS_ENDPOINT])
+        url = build_tts_url(endpoint)
 
         client = get_async_client(self.hass)
         try:

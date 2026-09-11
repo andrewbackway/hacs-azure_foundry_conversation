@@ -10,6 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AzureFoundryConfigEntry
+from .const import LOGGER
 from .entity import AzureFoundryBaseLLMEntity
 
 
@@ -42,7 +43,16 @@ class AzureFoundryAITaskEntity(
         chat_log: conversation.ChatLog,
     ) -> ai_task.GenDataTaskResult:
         """Handle a generate-data task."""
-        await self._async_handle_chat_log(chat_log, task.name, task.structure)
+        try:
+            await self._async_handle_chat_log(chat_log, task.name, task.structure)
+        except HomeAssistantError:
+            raise
+        except Exception:
+            LOGGER.exception(
+                "Unexpected error while generating data for AI Task entity %s",
+                self.entity_id,
+            )
+            raise
 
         if not isinstance(chat_log.content[-1], conversation.AssistantContent):
             raise HomeAssistantError(

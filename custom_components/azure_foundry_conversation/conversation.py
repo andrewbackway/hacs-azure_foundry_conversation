@@ -8,10 +8,11 @@ from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_LLM_HASS_API, CONF_PROMPT, MATCH_ALL
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AzureFoundryConfigEntry
-from .const import DOMAIN
+from .const import DOMAIN, LOGGER
 from .entity import AzureFoundryBaseLLMEntity
 
 
@@ -81,5 +82,14 @@ class AzureFoundryConversationEntity(
         except conversation.ConverseError as err:
             return err.as_conversation_result()
 
-        await self._async_handle_chat_log(chat_log)
+        try:
+            await self._async_handle_chat_log(chat_log)
+        except HomeAssistantError:
+            raise
+        except Exception:
+            LOGGER.exception(
+                "Unexpected error while handling conversation for entity %s",
+                self.entity_id,
+            )
+            raise
         return conversation.async_get_result_from_chat_log(user_input, chat_log)

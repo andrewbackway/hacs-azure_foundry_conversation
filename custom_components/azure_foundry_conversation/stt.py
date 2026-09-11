@@ -94,13 +94,22 @@ class AzureFoundrySTTEntity(stt.SpeechToTextEntity, AzureFoundrySpeechEntity):
     ) -> SpeechResult:
         """Recognize audio via the Azure Speech short-audio REST API."""
         options = self.subentry.data
+        endpoint = options.get(CONF_STT_ENDPOINT)
+        api_key = options.get(CONF_STT_API_KEY)
+        if not endpoint or not api_key:
+            LOGGER.error(
+                "Azure Speech STT endpoint or API key not configured; "
+                "reconfigure the STT entry to enable recognition"
+            )
+            return SpeechResult(None, SpeechResultState.ERROR)
+
         audio = bytearray()
         async for chunk in stream:
             audio.extend(chunk)
 
         result_format = options.get(CONF_STT_FORMAT, DEFAULT_STT_FORMAT)
         url = build_stt_url(
-            options[CONF_STT_ENDPOINT],
+            endpoint,
             options.get(CONF_STT_LANGUAGE, DEFAULT_STT_LANGUAGE),
             result_format,
             options.get(CONF_STT_PROFANITY, DEFAULT_STT_PROFANITY),
@@ -114,7 +123,7 @@ class AzureFoundrySTTEntity(stt.SpeechToTextEntity, AzureFoundrySpeechEntity):
             )
 
         headers = {
-            "Ocp-Apim-Subscription-Key": options[CONF_STT_API_KEY],
+            "Ocp-Apim-Subscription-Key": api_key,
             "Content-Type": content_type,
             "Accept": "application/json",
         }
@@ -136,7 +145,11 @@ class AzureFoundrySTTEntity(stt.SpeechToTextEntity, AzureFoundrySpeechEntity):
             LOGGER.error("Azure Speech STT connection error: %s", err)
             return SpeechResult(None, SpeechResultState.ERROR)
 
-        body = response.json()
+        try:
+            body = response.json()
+        except ValueError as err:
+            LOGGER.error("Azure Speech STT returned a non-JSON response: %s", err)
+            return SpeechResult(None, SpeechResultState.ERROR)
         if body.get("RecognitionStatus") != "Success":
             LOGGER.warning(
                 "Azure Speech STT returned status %s",
