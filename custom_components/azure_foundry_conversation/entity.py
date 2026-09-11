@@ -7,7 +7,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import openai
-from voluptuous_openapi import convert
+from voluptuous_openapi import UNSUPPORTED, convert
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
@@ -54,13 +54,40 @@ def _log_error(
     )
 
 
+def _strip_unsupported(obj: Any) -> Any:
+    """Recursively drop voluptuous_openapi UNSUPPORTED sentinels from a schema.
+
+    These are not JSON serializable; also prune any object ``required`` entries
+    that reference properties we had to remove.
+    """
+    if isinstance(obj, dict):
+        cleaned = {
+            key: _strip_unsupported(val)
+            for key, val in obj.items()
+            if val is not UNSUPPORTED
+        }
+        properties = cleaned.get("properties")
+        required = cleaned.get("required")
+        if isinstance(properties, dict) and isinstance(required, list):
+            cleaned["required"] = [
+                name for name in required if name in properties
+            ]
+        return cleaned
+    if isinstance(obj, list):
+        return [_strip_unsupported(item) for item in obj if item is not UNSUPPORTED]
+    return obj
+
+
 def _format_tool(tool: llm.Tool, custom_serializer: Any) -> dict[str, Any]:
     """Convert a Home Assistant LLM tool into a Responses function tool."""
+    parameters = _strip_unsupported(
+        convert(tool.parameters, custom_serializer=custom_serializer)
+    )
     return {
         "type": "function",
         "name": tool.name,
         "description": tool.description or "",
-        "parameters": convert(tool.parameters, custom_serializer=custom_serializer),
+        "parameters": parameters,
         "strict": False,
     }
 
@@ -83,7 +110,7 @@ def _adjust_schema(schema: dict[str, Any]) -> None:
 
 def _format_structure(structure: Any) -> dict[str, Any]:
     """Convert a voluptuous structure to a strict JSON schema."""
-    result = convert(structure)
+    result = _strip_unsupported(convert(structure))
     _adjust_schema(result)
     return result
 
