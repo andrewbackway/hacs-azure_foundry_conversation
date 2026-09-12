@@ -53,6 +53,14 @@ _SENTENCE_BOUNDARY_CHARS = ".!?\n"
 _RAW_PCM_RATES = {"8khz": 8000, "16khz": 16000, "24khz": 24000, "48khz": 48000}
 _DEFAULT_PCM_RATE = 24000
 
+# Silence padding (raw PCM zeros) around streamed segments. Lead silence covers
+# the player's start-of-playback ramp so the first word isn't clipped; gap
+# silence restores the natural pause Azure trims between per-sentence requests;
+# tail silence keeps the last word from being cut when playback stops.
+_LEAD_SILENCE_MS = 250
+_GAP_SILENCE_MS = 60
+_TAIL_SILENCE_MS = 150
+
 
 def _streaming_pcm_format(output_format: str) -> tuple[str, int]:
     """Return the raw-PCM Azure format + sample rate for streaming synthesis."""
@@ -60,6 +68,12 @@ def _streaming_pcm_format(output_format: str) -> tuple[str, int]:
         if token in output_format:
             return f"raw-{token}-16bit-mono-pcm", rate
     return f"raw-{_DEFAULT_PCM_RATE // 1000}khz-16bit-mono-pcm", _DEFAULT_PCM_RATE
+
+
+def _silence(sample_rate: int, milliseconds: int, *, bits: int = 16) -> bytes:
+    """Return mono PCM silence of the given duration."""
+    return b"\x00" * (sample_rate * milliseconds // 1000 * (bits // 8))
+
 
 
 def _wav_header(sample_rate: int, *, bits: int = 16, channels: int = 1) -> bytes:
@@ -301,11 +315,17 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
 
         async def data_gen() -> AsyncGenerator[bytes]:
             yield _wav_header(sample_rate)
+            yield _silence(sample_rate, _LEAD_SILENCE_MS)
+            first = True
             async for sentence in _sentence_chunks(request.message_gen):
+                if not first:
+                    yield _silence(sample_rate, _GAP_SILENCE_MS)
+                first = False
                 async for chunk in self._post_stream(
                     build_ssml(sentence), headers, url
                 ):
                     yield chunk
+            yield _silence(sample_rate, _TAIL_SILENCE_MS)
 
         return tts.TTSAudioResponse("wav", data_gen())
 

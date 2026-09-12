@@ -125,7 +125,7 @@ async def test_stream_output_single_sentence(
     assert response.extension == "wav"
     audio = b"".join(chunks)
     assert audio.startswith(b"RIFF")
-    assert audio.endswith(b"AUDIO")
+    assert b"AUDIO" in audio
     assert client.stream.call_count == 1
 
 
@@ -155,7 +155,7 @@ async def test_stream_input_multiple_sentences(
 
     audio = b"".join(chunks)
     assert audio.startswith(b"RIFF")
-    assert audio.endswith(b"one.two.")
+    assert audio.index(b"one.") < audio.index(b"two.")
     assert client.stream.call_count == 2
 
 
