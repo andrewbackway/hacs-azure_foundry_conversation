@@ -5,7 +5,7 @@ param(
     [string]$Bump = "patch",
     [string]$Version,
     [string]$Remote = "origin",
-    [switch]$Push,
+    [switch]$NoPush,
     [switch]$Release
 )
 
@@ -45,8 +45,8 @@ git -C $RepoRoot commit -m "Release $tag"
 git -C $RepoRoot tag $tag
 Write-Host "Bumped $current -> $new and created tag $tag locally."
 
-if (-not $Push) {
-    Write-Host "Skipping push (this instance is not connected to GitHub). Re-run with -Push to publish."
+if ($NoPush) {
+    Write-Host "Skipping push by request (-NoPush)."
     return
 }
 
