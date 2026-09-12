@@ -105,7 +105,7 @@ async def test_tts_supported_voices(
 async def test_stream_output_single_sentence(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Streaming a single sentence yields the response chunks in order."""
+    """Streaming emits a WAV header then the response PCM chunks."""
     entity = AzureFoundryTTSEntity(init_integration, _tts_subentry(init_integration))
     entity.hass = hass
 
@@ -122,15 +122,17 @@ async def test_stream_output_single_sentence(
         response = await entity.async_stream_tts_audio(request)
         chunks = [chunk async for chunk in response.data_gen]
 
-    assert response.extension == "mp3"
-    assert b"".join(chunks) == b"AUDIO"
+    assert response.extension == "wav"
+    audio = b"".join(chunks)
+    assert audio.startswith(b"RIFF")
+    assert audio.endswith(b"AUDIO")
     assert client.stream.call_count == 1
 
 
 async def test_stream_input_multiple_sentences(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Each sentence triggers its own synthesis request, streamed in order."""
+    """Each sentence is a separate request, concatenated after one WAV header."""
     entity = AzureFoundryTTSEntity(init_integration, _tts_subentry(init_integration))
     entity.hass = hass
 
@@ -151,14 +153,45 @@ async def test_stream_input_multiple_sentences(
         response = await entity.async_stream_tts_audio(request)
         chunks = [chunk async for chunk in response.data_gen]
 
-    assert b"".join(chunks) == b"one.two."
+    audio = b"".join(chunks)
+    assert audio.startswith(b"RIFF")
+    assert audio.endswith(b"one.two.")
     assert client.stream.call_count == 2
+
+
+async def test_stream_requests_raw_pcm(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Streaming requests a headerless raw-PCM format regardless of config."""
+    subentry = _tts_subentry(init_integration)
+    init_integration.subentries[subentry.subentry_id].data = {
+        **subentry.data,
+        CONF_TTS_OUTPUT_FORMAT: "audio-24khz-48kbitrate-mono-mp3",
+    }
+    entity = AzureFoundryTTSEntity(init_integration, _tts_subentry(init_integration))
+    entity.hass = hass
+
+    client = MagicMock()
+    client.stream = MagicMock(return_value=_FakeStream([b"pcm"]))
+    request = tts.TTSAudioRequest(
+        language="en-US", options={}, message_gen=_agen(["Hello."])
+    )
+
+    with patch(
+        "custom_components.azure_foundry_conversation.tts.get_async_client",
+        return_value=client,
+    ):
+        response = await entity.async_stream_tts_audio(request)
+        _ = [chunk async for chunk in response.data_gen]
+
+    headers = client.stream.call_args.kwargs["headers"]
+    assert headers["X-Microsoft-OutputFormat"] == "raw-24khz-16bit-mono-pcm"
 
 
 async def test_stream_error_raises(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """A non-200 streaming response raises before any audio is yielded."""
+    """A non-200 streaming response raises HomeAssistantError."""
     entity = AzureFoundryTTSEntity(init_integration, _tts_subentry(init_integration))
     entity.hass = hass
 
@@ -210,41 +243,10 @@ async def test_stream_disabled_falls_back(
         response = await entity.async_stream_tts_audio(request)
         chunks = [chunk async for chunk in response.data_gen]
 
+    assert response.extension == "mp3"
     assert b"".join(chunks) == b"BLOB"
     assert client.post.await_count == 1
     assert client.stream.call_count == 0
-
-
-async def test_stream_wav_uses_single_request(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    """WAV output can't be concatenated, so it streams one request only."""
-    subentry = _tts_subentry(init_integration)
-    init_integration.subentries[subentry.subentry_id].data = {
-        **subentry.data,
-        CONF_TTS_OUTPUT_FORMAT: "riff-24khz-16bit-mono-pcm",
-    }
-    entity = AzureFoundryTTSEntity(init_integration, _tts_subentry(init_integration))
-    entity.hass = hass
-
-    client = MagicMock()
-    client.stream = MagicMock(return_value=_FakeStream([b"WAV"]))
-    request = tts.TTSAudioRequest(
-        language="en-US",
-        options={},
-        message_gen=_agen(["First. ", "Second."]),
-    )
-
-    with patch(
-        "custom_components.azure_foundry_conversation.tts.get_async_client",
-        return_value=client,
-    ):
-        response = await entity.async_stream_tts_audio(request)
-        chunks = [chunk async for chunk in response.data_gen]
-
-    assert response.extension == "wav"
-    assert b"".join(chunks) == b"WAV"
-    assert client.stream.call_count == 1
 
 
 @pytest.mark.parametrize(

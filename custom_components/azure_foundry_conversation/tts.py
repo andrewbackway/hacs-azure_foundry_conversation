@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
 from xml.sax.saxutils import escape, quoteattr
@@ -44,6 +45,50 @@ _DEFAULT_LANGUAGE = "en-US"
 # first audio chunk isn't held back by an unbounded buffer.
 _MAX_CHUNK_CHARS = 200
 _SENTENCE_BOUNDARY_CHARS = ".!?\n"
+
+# Streaming input synthesizes each sentence as a separate request. Concatenating
+# independent MP3/OGG payloads clips words at the seams (codec priming/padding),
+# so streaming mode requests headerless raw PCM and wraps it in one WAV stream,
+# which concatenates sample-accurately. Rate is derived from the chosen format.
+_RAW_PCM_RATES = {"8khz": 8000, "16khz": 16000, "24khz": 24000, "48khz": 48000}
+_DEFAULT_PCM_RATE = 24000
+
+
+def _streaming_pcm_format(output_format: str) -> tuple[str, int]:
+    """Return the raw-PCM Azure format + sample rate for streaming synthesis."""
+    for token, rate in _RAW_PCM_RATES.items():
+        if token in output_format:
+            return f"raw-{token}-16bit-mono-pcm", rate
+    return f"raw-{_DEFAULT_PCM_RATE // 1000}khz-16bit-mono-pcm", _DEFAULT_PCM_RATE
+
+
+def _wav_header(sample_rate: int, *, bits: int = 16, channels: int = 1) -> bytes:
+    """Build a streaming WAV header for 16-bit mono PCM of unknown length."""
+    byte_rate = sample_rate * channels * bits // 8
+    block_align = channels * bits // 8
+    # Length is unknown while streaming; 0xFFFFFFFF tells players to read to EOF.
+    streaming_size = 0xFFFFFFFF
+    return b"".join(
+        (
+            b"RIFF",
+            struct.pack("<I", streaming_size),
+            b"WAVE",
+            b"fmt ",
+            struct.pack(
+                "<IHHIIHH",
+                16,
+                1,
+                channels,
+                sample_rate,
+                byte_rate,
+                block_align,
+                bits,
+            ),
+            b"data",
+            struct.pack("<I", streaming_size),
+        )
+    )
+
 
 
 def _find_boundary(buffer: str) -> int | None:
@@ -200,7 +245,7 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
         self, message: str, language: str, options: dict[str, Any]
     ) -> tts.TtsAudioType:
         """Synthesize speech via the Azure Speech REST API (single request)."""
-        build_ssml, headers, url, extension, _concat_safe = self._resolve_request(
+        build_ssml, headers, url, extension = self._resolve_request(
             language, options
         )
         client = get_async_client(self.hass)
@@ -228,16 +273,17 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
     async def async_stream_tts_audio(
         self, request: tts.TTSAudioRequest
     ) -> tts.TTSAudioResponse:
-        """Stream synthesized audio, optionally as the text is generated."""
-        build_ssml, headers, url, extension, concat_safe = self._resolve_request(
-            request.language, request.options
-        )
+        """Stream synthesized audio as the text is generated.
+
+        Streaming mode requests headerless raw PCM and wraps all sentences in a
+        single WAV stream so per-sentence segments concatenate without clipping.
+        """
         streaming = self.subentry.data.get(CONF_TTS_STREAMING, DEFAULT_TTS_STREAMING)
 
         if not streaming:
             # Buffer the whole message and synthesize in one non-streaming call.
             message = "".join([chunk async for chunk in request.message_gen])
-            _extension, audio = await self.async_get_tts_audio(
+            extension, audio = await self.async_get_tts_audio(
                 message, request.language, request.options
             )
 
@@ -246,27 +292,34 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
 
             return tts.TTSAudioResponse(extension, _single_blob())
 
-        if not concat_safe:
-            # WAV/PCM can't be concatenated across requests; stream one response.
-            message = "".join([chunk async for chunk in request.message_gen])
-            return tts.TTSAudioResponse(
-                extension, self._post_stream(build_ssml(message), headers, url)
-            )
-
-        # Input streaming: synthesize sentence-by-sentence as text arrives.
-        return tts.TTSAudioResponse(
-            extension,
-            self._stream_sentences(request.message_gen, build_ssml, headers, url),
+        pcm_format, sample_rate = _streaming_pcm_format(
+            self.subentry.data.get(CONF_TTS_OUTPUT_FORMAT, DEFAULT_TTS_OUTPUT_FORMAT)
+        )
+        build_ssml, headers, url, _extension = self._resolve_request(
+            request.language, request.options, output_format=pcm_format
         )
 
+        async def data_gen() -> AsyncGenerator[bytes]:
+            yield _wav_header(sample_rate)
+            async for sentence in _sentence_chunks(request.message_gen):
+                async for chunk in self._post_stream(
+                    build_ssml(sentence), headers, url
+                ):
+                    yield chunk
+
+        return tts.TTSAudioResponse("wav", data_gen())
+
     def _resolve_request(
-        self, language: str, options: dict[str, Any]
-    ) -> tuple[Callable[[str], str], dict[str, str], str, str, bool]:
+        self,
+        language: str,
+        options: dict[str, Any],
+        output_format: str | None = None,
+    ) -> tuple[Callable[[str], str], dict[str, str], str, str]:
         """Resolve the reusable synthesis context for a request.
 
-        Returns an SSML builder plus the shared headers, URL, audio file
-        extension, and whether the format is safe to concatenate across
-        multiple synthesis requests (false for WAV/PCM).
+        Returns an SSML builder plus the shared headers, URL, and audio file
+        extension. ``output_format`` overrides the configured format (used to
+        request raw PCM for seamless streaming).
         """
         data = self.subentry.data
         endpoint, api_key = self._resolve_speech_credentials(
@@ -280,9 +333,11 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
         voice = options.get(tts.ATTR_VOICE) or data.get(
             CONF_TTS_VOICE, DEFAULT_TTS_VOICE
         )
-        output_format = data.get(CONF_TTS_OUTPUT_FORMAT, DEFAULT_TTS_OUTPUT_FORMAT)
+        resolved_format = output_format or data.get(
+            CONF_TTS_OUTPUT_FORMAT, DEFAULT_TTS_OUTPUT_FORMAT
+        )
         extension, _content_type = TTS_OUTPUT_FORMATS.get(
-            output_format, ("mp3", "audio/mpeg")
+            resolved_format, ("mp3", "audio/mpeg")
         )
         resolved_language = (
             language or data.get(CONF_TTS_LANGUAGE) or _DEFAULT_LANGUAGE
@@ -304,11 +359,10 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
         headers = {
             "Ocp-Apim-Subscription-Key": api_key,
             "Content-Type": "application/ssml+xml",
-            "X-Microsoft-OutputFormat": output_format,
+            "X-Microsoft-OutputFormat": resolved_format,
             "User-Agent": "home-assistant-azure-foundry",
         }
-        concat_safe = extension != "wav"
-        return build_ssml, headers, build_tts_url(endpoint), extension, concat_safe
+        return build_ssml, headers, build_tts_url(endpoint), extension
 
     async def _post_stream(
         self, ssml: str, headers: dict[str, str], url: str
@@ -336,16 +390,4 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
         except httpx.HTTPError as err:
             LOGGER.error("Azure Speech TTS connection error: %s", err)
             raise HomeAssistantError("Azure Speech TTS request failed") from err
-
-    async def _stream_sentences(
-        self,
-        message_gen: AsyncGenerator[str],
-        build_ssml: Callable[[str], str],
-        headers: dict[str, str],
-        url: str,
-    ) -> AsyncGenerator[bytes]:
-        """Synthesize and stream audio one sentence at a time, in order."""
-        async for sentence in _sentence_chunks(message_gen):
-            async for chunk in self._post_stream(build_ssml(sentence), headers, url):
-                yield chunk
 

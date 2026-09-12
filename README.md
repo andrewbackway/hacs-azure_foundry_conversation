@@ -132,8 +132,8 @@ several agents with different deployments or prompts.
 | API key | — | Azure Speech key. |
 | Voice | `en-US-JennyNeural` | Voice short name. |
 | Language/locale | from voice | SSML `xml:lang`. |
-| Output format | `audio-24khz-48kbitrate-mono-mp3` | `X-Microsoft-OutputFormat`. |
-| Stream audio | `on` | Streams audio as it's synthesized for lower latency. WAV/PCM formats fall back to a single request. |
+| Output format | `audio-24khz-48kbitrate-mono-mp3` | `X-Microsoft-OutputFormat` (used when streaming is off). |
+| Stream audio | `on` | Streams seamless PCM/WAV as it's synthesized for lower latency; sample rate follows the output format. |
 | Rate / Pitch / Volume | — | SSML prosody (e.g. `+10%`, `+2st`, `+6dB`). |
 | Style / Style degree / Role | — | `mstts:express-as` (voice-dependent). |
 
