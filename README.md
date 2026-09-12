@@ -23,7 +23,9 @@ classic Chat Completions API rejects tools + reasoning for these models — see
   HA Assist), streaming, and configurable reasoning effort.
 - **AI Task** — `ai_task.generate_data` with optional structured (JSON) output.
 - **Speech-to-Text** — Azure AI Speech short-audio recognition.
-- **Text-to-Speech** — Azure AI Speech neural voices via SSML.
+- **Text-to-Speech** — Azure AI Speech neural voices via SSML, with low-latency
+  streaming that plays audio as it is synthesized (sentence-by-sentence as the
+  model generates text).
 
 ## Prerequisites
 
@@ -81,8 +83,8 @@ Copy `custom_components/azure_foundry_conversation/` into your Home Assistant
      optionally set instructions (prompt), *Control Home Assistant* (LLM/Assist
      API), reasoning effort, max output tokens and verbosity.
    - **STT** — Speech endpoint URL, API key, language, result format, profanity.
-   - **TTS** — Speech endpoint URL, API key, voice, output format, and optional
-     rate / pitch / volume / style / style degree / role.
+   - **TTS** — Speech endpoint URL, API key, voice, output format, streaming
+     toggle, and optional rate / pitch / volume / style / style degree / role.
 4. Assign the entities to an **Assist pipeline**
    (*Settings → Voice assistants*): conversation agent + STT + TTS.
 
@@ -131,6 +133,7 @@ several agents with different deployments or prompts.
 | Voice | `en-US-JennyNeural` | Voice short name. |
 | Language/locale | from voice | SSML `xml:lang`. |
 | Output format | `audio-24khz-48kbitrate-mono-mp3` | `X-Microsoft-OutputFormat`. |
+| Stream audio | `on` | Streams audio as it's synthesized for lower latency. WAV/PCM formats fall back to a single request. |
 | Rate / Pitch / Volume | — | SSML prosody (e.g. `+10%`, `+2st`, `+6dB`). |
 | Style / Style degree / Role | — | `mstts:express-as` (voice-dependent). |
 

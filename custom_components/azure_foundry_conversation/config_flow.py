@@ -55,6 +55,7 @@ from .const import (
     CONF_TTS_PITCH,
     CONF_TTS_RATE,
     CONF_TTS_ROLE,
+    CONF_TTS_STREAMING,
     CONF_TTS_STYLE,
     CONF_TTS_STYLE_DEGREE,
     CONF_TTS_VOICE,
@@ -68,6 +69,7 @@ from .const import (
     DEFAULT_STT_PROFANITY,
     DEFAULT_TTS_NAME,
     DEFAULT_TTS_OUTPUT_FORMAT,
+    DEFAULT_TTS_STREAMING,
     DEFAULT_TTS_VOICE,
     DOMAIN,
     LOGGER,
@@ -536,6 +538,9 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
                         mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
+                vol.Optional(
+                    CONF_TTS_STREAMING, default=DEFAULT_TTS_STREAMING
+                ): bool,
                 vol.Optional(CONF_TTS_RATE): str,
                 vol.Optional(CONF_TTS_PITCH): str,
                 vol.Optional(CONF_TTS_VOLUME): str,

@@ -45,6 +45,7 @@ CONF_TTS_VOLUME = "tts_volume"
 CONF_TTS_STYLE = "tts_style"
 CONF_TTS_STYLE_DEGREE = "tts_style_degree"
 CONF_TTS_ROLE = "tts_role"
+CONF_TTS_STREAMING = "tts_streaming"
 
 # Recommended defaults (conversation / AI Task).
 RECOMMENDED_CHAT_MODEL = "gpt-5.6-sol"
@@ -58,6 +59,7 @@ DEFAULT_STT_FORMAT = "simple"
 DEFAULT_STT_PROFANITY = "masked"
 DEFAULT_TTS_VOICE = "en-US-JennyNeural"
 DEFAULT_TTS_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3"
+DEFAULT_TTS_STREAMING = True
 
 STT_FORMATS: list[str] = ["simple", "detailed"]
 STT_PROFANITY_OPTIONS: list[str] = ["masked", "removed", "raw"]
@@ -147,6 +149,7 @@ RECOMMENDED_STT_OPTIONS = {
 RECOMMENDED_TTS_OPTIONS = {
     CONF_TTS_VOICE: DEFAULT_TTS_VOICE,
     CONF_TTS_OUTPUT_FORMAT: DEFAULT_TTS_OUTPUT_FORMAT,
+    CONF_TTS_STREAMING: DEFAULT_TTS_STREAMING,
 }
 
 

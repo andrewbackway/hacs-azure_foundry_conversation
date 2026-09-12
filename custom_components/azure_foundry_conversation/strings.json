@@ -139,6 +139,7 @@
             "tts_voice": "Voice (short name)",
             "tts_language": "Language/locale",
             "tts_output_format": "Output format",
+            "tts_streaming": "Stream audio (lower latency)",
             "tts_rate": "Rate",
             "tts_pitch": "Pitch",
             "tts_volume": "Volume",

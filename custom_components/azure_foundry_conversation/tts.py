@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 from xml.sax.saxutils import escape, quoteattr
 
@@ -23,11 +24,13 @@ from .const import (
     CONF_TTS_PITCH,
     CONF_TTS_RATE,
     CONF_TTS_ROLE,
+    CONF_TTS_STREAMING,
     CONF_TTS_STYLE,
     CONF_TTS_STYLE_DEGREE,
     CONF_TTS_VOICE,
     CONF_TTS_VOLUME,
     DEFAULT_TTS_OUTPUT_FORMAT,
+    DEFAULT_TTS_STREAMING,
     DEFAULT_TTS_VOICE,
     LOGGER,
     SPEECH_LANGUAGES,
@@ -36,6 +39,41 @@ from .const import (
 from .entity import AzureFoundrySpeechEntity
 
 _DEFAULT_LANGUAGE = "en-US"
+
+# Force a synthesis boundary on long run-on text with no punctuation so the
+# first audio chunk isn't held back by an unbounded buffer.
+_MAX_CHUNK_CHARS = 200
+_SENTENCE_BOUNDARY_CHARS = ".!?\n"
+
+
+def _find_boundary(buffer: str) -> int | None:
+    """Return the split index (exclusive) for the first sentence in buffer.
+
+    Splits just after a sentence-ending character; otherwise forces a split
+    once the buffer exceeds the max length, preferring the last space.
+    """
+    for index, char in enumerate(buffer):
+        if char in _SENTENCE_BOUNDARY_CHARS:
+            return index + 1
+    if len(buffer) >= _MAX_CHUNK_CHARS:
+        cut = buffer.rfind(" ", 0, _MAX_CHUNK_CHARS)
+        return cut + 1 if cut > 0 else _MAX_CHUNK_CHARS
+    return None
+
+
+async def _sentence_chunks(message_gen: AsyncGenerator[str]) -> AsyncGenerator[str]:
+    """Yield sentence-sized chunks from an incremental text generator."""
+    buffer = ""
+    async for text in message_gen:
+        buffer += text
+        while (split_at := _find_boundary(buffer)) is not None:
+            sentence = buffer[:split_at].strip()
+            buffer = buffer[split_at:].lstrip()
+            if sentence:
+                yield sentence
+    tail = buffer.strip()
+    if tail:
+        yield tail
 
 
 async def async_setup_entry(
@@ -161,7 +199,75 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
     async def async_get_tts_audio(
         self, message: str, language: str, options: dict[str, Any]
     ) -> tts.TtsAudioType:
-        """Synthesize speech via the Azure Speech REST API."""
+        """Synthesize speech via the Azure Speech REST API (single request)."""
+        build_ssml, headers, url, extension, _concat_safe = self._resolve_request(
+            language, options
+        )
+        client = get_async_client(self.hass)
+        try:
+            response = await client.post(
+                url,
+                headers=headers,
+                content=build_ssml(message).encode("utf-8"),
+                timeout=30.0,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as err:
+            LOGGER.error(
+                "Azure Speech TTS failed (status=%s): %s",
+                err.response.status_code,
+                err,
+            )
+            raise HomeAssistantError("Azure Speech TTS request failed") from err
+        except httpx.HTTPError as err:
+            LOGGER.error("Azure Speech TTS connection error: %s", err)
+            raise HomeAssistantError("Azure Speech TTS request failed") from err
+
+        return extension, response.content
+
+    async def async_stream_tts_audio(
+        self, request: tts.TTSAudioRequest
+    ) -> tts.TTSAudioResponse:
+        """Stream synthesized audio, optionally as the text is generated."""
+        build_ssml, headers, url, extension, concat_safe = self._resolve_request(
+            request.language, request.options
+        )
+        streaming = self.subentry.data.get(CONF_TTS_STREAMING, DEFAULT_TTS_STREAMING)
+
+        if not streaming:
+            # Buffer the whole message and synthesize in one non-streaming call.
+            message = "".join([chunk async for chunk in request.message_gen])
+            _extension, audio = await self.async_get_tts_audio(
+                message, request.language, request.options
+            )
+
+            async def _single_blob() -> AsyncGenerator[bytes]:
+                yield audio
+
+            return tts.TTSAudioResponse(extension, _single_blob())
+
+        if not concat_safe:
+            # WAV/PCM can't be concatenated across requests; stream one response.
+            message = "".join([chunk async for chunk in request.message_gen])
+            return tts.TTSAudioResponse(
+                extension, self._post_stream(build_ssml(message), headers, url)
+            )
+
+        # Input streaming: synthesize sentence-by-sentence as text arrives.
+        return tts.TTSAudioResponse(
+            extension,
+            self._stream_sentences(request.message_gen, build_ssml, headers, url),
+        )
+
+    def _resolve_request(
+        self, language: str, options: dict[str, Any]
+    ) -> tuple[Callable[[str], str], dict[str, str], str, str, bool]:
+        """Resolve the reusable synthesis context for a request.
+
+        Returns an SSML builder plus the shared headers, URL, audio file
+        extension, and whether the format is safe to concatenate across
+        multiple synthesis requests (false for WAV/PCM).
+        """
         data = self.subentry.data
         endpoint, api_key = self._resolve_speech_credentials(
             CONF_TTS_ENDPOINT, CONF_TTS_API_KEY
@@ -178,18 +284,22 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
         extension, _content_type = TTS_OUTPUT_FORMATS.get(
             output_format, ("mp3", "audio/mpeg")
         )
-
-        ssml = _build_ssml(
-            message,
-            language or data.get(CONF_TTS_LANGUAGE) or _DEFAULT_LANGUAGE,
-            voice,
-            rate=data.get(CONF_TTS_RATE),
-            pitch=data.get(CONF_TTS_PITCH),
-            volume=data.get(CONF_TTS_VOLUME),
-            style=data.get(CONF_TTS_STYLE),
-            style_degree=data.get(CONF_TTS_STYLE_DEGREE),
-            role=data.get(CONF_TTS_ROLE),
+        resolved_language = (
+            language or data.get(CONF_TTS_LANGUAGE) or _DEFAULT_LANGUAGE
         )
+
+        def build_ssml(text: str) -> str:
+            return _build_ssml(
+                text,
+                resolved_language,
+                voice,
+                rate=data.get(CONF_TTS_RATE),
+                pitch=data.get(CONF_TTS_PITCH),
+                volume=data.get(CONF_TTS_VOLUME),
+                style=data.get(CONF_TTS_STYLE),
+                style_degree=data.get(CONF_TTS_STYLE_DEGREE),
+                role=data.get(CONF_TTS_ROLE),
+            )
 
         headers = {
             "Ocp-Apim-Subscription-Key": api_key,
@@ -197,23 +307,45 @@ class AzureFoundryTTSEntity(tts.TextToSpeechEntity, AzureFoundrySpeechEntity):
             "X-Microsoft-OutputFormat": output_format,
             "User-Agent": "home-assistant-azure-foundry",
         }
-        url = build_tts_url(endpoint)
+        concat_safe = extension != "wav"
+        return build_ssml, headers, build_tts_url(endpoint), extension, concat_safe
 
+    async def _post_stream(
+        self, ssml: str, headers: dict[str, str], url: str
+    ) -> AsyncGenerator[bytes]:
+        """Stream the audio body of one Azure Speech synthesis request."""
         client = get_async_client(self.hass)
         try:
-            response = await client.post(
-                url, headers=headers, content=ssml.encode("utf-8"), timeout=30.0
-            )
-            response.raise_for_status()
-        except httpx.HTTPStatusError as err:
-            LOGGER.error(
-                "Azure Speech TTS failed (status=%s): %s",
-                err.response.status_code,
-                err,
-            )
-            raise HomeAssistantError("Azure Speech TTS request failed") from err
+            async with client.stream(
+                "POST",
+                url,
+                headers=headers,
+                content=ssml.encode("utf-8"),
+                timeout=30.0,
+            ) as response:
+                if response.status_code != 200:
+                    body = await response.aread()
+                    LOGGER.error(
+                        "Azure Speech TTS failed (status=%s): %s",
+                        response.status_code,
+                        body[:200],
+                    )
+                    raise HomeAssistantError("Azure Speech TTS request failed")
+                async for chunk in response.aiter_bytes():
+                    yield chunk
         except httpx.HTTPError as err:
             LOGGER.error("Azure Speech TTS connection error: %s", err)
             raise HomeAssistantError("Azure Speech TTS request failed") from err
 
-        return extension, response.content
+    async def _stream_sentences(
+        self,
+        message_gen: AsyncGenerator[str],
+        build_ssml: Callable[[str], str],
+        headers: dict[str, str],
+        url: str,
+    ) -> AsyncGenerator[bytes]:
+        """Synthesize and stream audio one sentence at a time, in order."""
+        async for sentence in _sentence_chunks(message_gen):
+            async for chunk in self._post_stream(build_ssml(sentence), headers, url):
+                yield chunk
+
