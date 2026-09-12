@@ -142,7 +142,7 @@ def _convert_content_to_param(
             {
                 "type": "function_call_output",
                 "call_id": content.tool_call_id,
-                "output": json.dumps(content.tool_result),
+                "output": json.dumps(content.tool_result, default=str),
             }
         ]
 
