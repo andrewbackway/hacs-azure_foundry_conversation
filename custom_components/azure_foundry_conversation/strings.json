@@ -20,6 +20,18 @@
           "endpoint": "Endpoint URL",
           "api_key": "API key"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Azure AI Foundry",
+        "description": "Update your Azure AI Foundry resource endpoint and API key.",
+        "data": {
+          "endpoint": "Endpoint URL",
+          "api_key": "API key"
+        },
+        "data_description": {
+          "endpoint": "Base resource URL, e.g. https://your-resource.services.ai.azure.com/",
+          "api_key": "A key from the resource's Keys and Endpoint page"
+        }
       }
     },
     "error": {
@@ -29,7 +41,8 @@
     },
     "abort": {
       "already_configured": "This endpoint is already configured",
-      "reauth_successful": "Re-authentication was successful"
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Reconfiguration was successful"
     }
   },
   "config_subentries": {

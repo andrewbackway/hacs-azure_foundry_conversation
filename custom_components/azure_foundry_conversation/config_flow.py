@@ -177,6 +177,43 @@ class AzureFoundryConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Allow editing the endpoint and API key of an existing entry."""
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            try:
+                await validate_input(self.hass, user_input)
+            except openai.AuthenticationError:
+                errors["base"] = "invalid_auth"
+            except openai.APIConnectionError:
+                errors["base"] = "cannot_connect"
+            except openai.OpenAIError as err:
+                LOGGER.error(
+                    "Validation error for endpoint %s: %s",
+                    endpoint_host(user_input[CONF_ENDPOINT]),
+                    err,
+                )
+                errors["base"] = "cannot_connect"
+            except Exception:  # noqa: BLE001
+                LOGGER.exception("Unexpected exception during config validation")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry, data_updates=user_input
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_DATA_SCHEMA, user_input or dict(reconfigure_entry.data)
+            ),
+            errors=errors,
+        )
+
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
